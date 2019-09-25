@@ -49,6 +49,10 @@ func (rs *BoltStore) decode(data []byte, out interface{}) error {
 	return json.Unmarshal(data, out)
 }
 
+func (rs *BoltStore) UpsertingCustomRace() bool {
+	return false
+}
+
 func (rs *BoltStore) UpsertCustomRace(race *CustomRace) error {
 	return rs.db.Update(func(tx *bbolt.Tx) error {
 		bkt, err := rs.customRaceBucket(tx)

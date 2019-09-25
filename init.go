@@ -67,6 +67,7 @@ func InitWithResolver(resolver *Resolver) error {
 
 	raceManager := resolver.resolveRaceManager()
 	go raceManager.LoopRaces()
+	err = raceManager.WatchSharedConfigs()
 
 	err = raceManager.InitScheduledRaces()
 

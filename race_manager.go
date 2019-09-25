@@ -3,6 +3,7 @@ package servermanager
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/cj123/assetto-server-manager/pkg/udp"
 
 	"github.com/etcd-io/bbolt"
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-chi/chi"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -1393,4 +1395,106 @@ func (rm *RaceManager) RescheduleNotifications(oldServerOpts *GlobalServerConfig
 	}
 
 	return nil
+}
+
+func (rm *RaceManager) WatchSharedConfigs() error {
+	if config.Store.SharedPath == "" {
+		return nil
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		var ok bool
+		var buffer fsnotify.Event
+
+		buffer, ok = <-watcher.Events
+
+		if !ok {
+			return
+		}
+
+		for {
+			select {
+			case buffer, ok = <-watcher.Events:
+				if !ok {
+					return
+				}
+				logrus.Debugf("debouncing event: %s", buffer)
+			case <-time.After(500 * time.Millisecond):
+				logrus.Debugf("handling event: %s", buffer)
+
+				if !rm.raceStore.UpsertingCustomRace() {
+					logrus.Infof("rescheduling races")
+					_ = rm.InitScheduledRaces()
+				} else {
+					logrus.Debugf("ignoring event, local upsert")
+				}
+
+				buffer, ok = <-watcher.Events
+				if !ok {
+					return
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("error:", err)
+			}
+		}
+	}()
+
+	err = watcher.Add(filepath.Join(config.Store.SharedPath, customRacesDir))
+
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Shared race config monitoring started")
+
+	return nil
+}
+
+func debounceChannel(interval time.Duration, output chan fsnotify.Event) chan fsnotify.Event {
+	input := make(chan fsnotify.Event)
+
+	go func() {
+		var buffer fsnotify.Event
+		var ok bool
+
+		// We do not start waiting for interval until called at least once
+		buffer, ok = <-input
+		// If channel closed exit, we could also close output
+		if !ok {
+			return
+		}
+
+		// We start waiting for an interval
+		for {
+			select {
+			case buffer, ok = <-input:
+				// If channel closed exit, we could also close output
+				if !ok {
+					return
+				}
+				log.Println("debouncing event:", buffer)
+
+			case <-time.After(interval):
+				// Interval has passed and we have data, so send it
+				output <- buffer
+				// Wait for data again before starting waiting for an interval
+				buffer, ok = <-input
+				if !ok {
+					return
+				}
+				// If channel is not closed we have more data and start waiting for interval
+			}
+		}
+	}()
+
+	return input
 }

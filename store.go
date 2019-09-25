@@ -6,6 +6,7 @@ type Store interface {
 	FindCustomRaceByID(uuid string) (*CustomRace, error)
 	ListCustomRaces() ([]*CustomRace, error)
 	DeleteCustomRace(race *CustomRace) error
+	UpsertingCustomRace() bool
 
 	// Entrants
 	UpsertEntrant(entrant Entrant) error

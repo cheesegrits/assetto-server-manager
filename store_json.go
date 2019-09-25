@@ -111,8 +111,41 @@ func (rs *JSONStore) decodeFile(path string, filename string, out interface{}) e
 	return enc.Decode(out)
 }
 
+func (rs *JSONStore) CreateLockFile() error {
+	name := filepath.Join(rs.shared, "upsert.lock")
+	file, err := os.OpenFile(name, os.O_RDONLY|os.O_CREATE, 0666)
+
+	if err != nil {
+		return err
+	}
+
+	return file.Close()
+}
+
+func (rs *JSONStore) DeleteLockFile() error {
+	name := filepath.Join(rs.shared, "upsert.lock")
+	_, _ = os.OpenFile(name, os.O_RDONLY|os.O_CREATE, 0666)
+
+	return os.Remove(name)
+}
+
+func (rs *JSONStore) UpsertingCustomRace() bool {
+	var name = filepath.Join(rs.shared, "upsert.lock")
+	_, err := os.Stat(name)
+
+	return !os.IsNotExist(err)
+}
+
 func (rs *JSONStore) UpsertCustomRace(race *CustomRace) error {
-	return rs.encodeFile(rs.shared, filepath.Join(customRacesDir, race.UUID.String()+".json"), race)
+	_ = rs.CreateLockFile()
+
+	err := rs.encodeFile(rs.shared, filepath.Join(customRacesDir, race.UUID.String()+".json"), race)
+
+	time.AfterFunc(time.Duration(2)*time.Second, func() {
+		rs.DeleteLockFile()
+	})
+
+	return err
 }
 
 func (rs *JSONStore) FindCustomRaceByID(uuid string) (*CustomRace, error) {
