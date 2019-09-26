@@ -14,6 +14,7 @@ import (
 type CustomRace struct {
 	Name                            string
 	HasCustomName, OverridePassword bool
+	LocalEntryList                  bool
 	ReplacementPassword             string
 
 	Created          time.Time
@@ -39,6 +40,10 @@ func (cr *CustomRace) EventName() string {
 
 func (cr *CustomRace) OverrideServerPassword() bool {
 	return cr.OverridePassword
+}
+
+func (cr *CustomRace) UseLocalEntryList() bool {
+	return cr.LocalEntryList
 }
 
 func (cr *CustomRace) ReplacementServerPassword() string {

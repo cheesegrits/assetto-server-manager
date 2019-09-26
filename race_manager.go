@@ -601,6 +601,7 @@ func (rm *RaceManager) SetupCustomRace(r *http.Request) error {
 
 	overridePassword := r.FormValue("OverridePassword") == "1"
 	replacementPassword := r.FormValue("ReplacementPassword")
+	localEntryList := r.FormValue("LocalEntryList") == "1"
 
 	if customRaceID := r.FormValue("Editing"); customRaceID != "" {
 		// we are editing the race. load the previous one and overwrite it with this one
@@ -612,6 +613,7 @@ func (rm *RaceManager) SetupCustomRace(r *http.Request) error {
 
 		customRace.OverridePassword = overridePassword
 		customRace.ReplacementPassword = replacementPassword
+		customRace.LocalEntryList = localEntryList
 
 		customRace.Name = r.FormValue("CustomRaceName")
 		customRace.EntryList = entryList
@@ -623,7 +625,7 @@ func (rm *RaceManager) SetupCustomRace(r *http.Request) error {
 		schedule := r.FormValue("action") == "schedule"
 
 		// save the custom race preset
-		race, err := rm.SaveCustomRace(r.FormValue("CustomRaceName"), overridePassword, replacementPassword, *raceConfig, entryList, saveAsPresetWithoutStartingRace)
+		race, err := rm.SaveCustomRace(r.FormValue("CustomRaceName"), overridePassword, replacementPassword, localEntryList, *raceConfig, entryList, saveAsPresetWithoutStartingRace)
 
 		if err != nil {
 			return err
@@ -736,6 +738,7 @@ type RaceTemplateVars struct {
 	CustomRaceName      string
 	SurfacePresets      []TrackSurfacePreset
 	OverridePassword    bool
+	LocalEntryList      bool
 	ReplacementPassword string
 	Tyres               Tyres
 	DeselectedTyres     map[string]bool
@@ -787,6 +790,7 @@ func (rm *RaceManager) BuildRaceOpts(r *http.Request) (*RaceTemplateVars, error)
 	isEditing := templateIDForEditing != ""
 	var customRaceName, replacementPassword string
 	var overridePassword bool
+	var localEntryList bool
 
 	if isEditing {
 		customRace, err := rm.raceStore.FindCustomRaceByID(templateIDForEditing)
@@ -800,6 +804,7 @@ func (rm *RaceManager) BuildRaceOpts(r *http.Request) (*RaceTemplateVars, error)
 		entrants = customRace.EntryList
 		overridePassword = customRace.OverrideServerPassword()
 		replacementPassword = customRace.ReplacementServerPassword()
+		localEntryList = customRace.UseLocalEntryList()
 	}
 
 	possibleEntrants, err := rm.ListAutoFillEntrants()
@@ -848,6 +853,7 @@ func (rm *RaceManager) BuildRaceOpts(r *http.Request) (*RaceTemplateVars, error)
 		SurfacePresets:      DefaultTrackSurfacePresets,
 		OverridePassword:    overridePassword,
 		ReplacementPassword: replacementPassword,
+		LocalEntryList:      localEntryList,
 	}
 
 	err = rm.applyCurrentRaceSetupToOptions(opts, race.CurrentRaceConfig)
@@ -918,7 +924,7 @@ func (rm *RaceManager) SaveEntrantsForAutoFill(entryList EntryList) error {
 }
 
 func (rm *RaceManager) SaveCustomRace(name string, overridePassword bool, replacementPassword string,
-	config CurrentRaceConfig, entryList EntryList, starred bool) (*CustomRace, error) {
+	localEntryList bool, config CurrentRaceConfig, entryList EntryList, starred bool) (*CustomRace, error) {
 
 	hasCustomRaceName := true
 
@@ -947,6 +953,7 @@ func (rm *RaceManager) SaveCustomRace(name string, overridePassword bool, replac
 		Name:                name,
 		HasCustomName:       hasCustomRaceName,
 		OverridePassword:    overridePassword,
+		LocalEntryList:      localEntryList,
 		ReplacementPassword: replacementPassword,
 		Created:             time.Now(),
 		UUID:                uuid.New(),
