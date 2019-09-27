@@ -611,6 +611,26 @@
                             </div>
                         </div>
 
+                        <div class="form-group row">
+                            <label for="LocalEntryList" class="col-sm-3 col-form-label">Local Entry List</label>
+
+
+                            <div class="col-sm-9">
+                                <input type="checkbox"
+                                       id="LocalEntryList"
+                                       name="LocalEntryList"
+
+                                        {{ if .LocalEntryList }}
+                                            checked="checked"
+                                        {{ end }}
+                                >
+
+                                <br>
+
+                                <small>For multi server setups, select this option if you need each server to have its own entry list, usually when you are using pre-booked entries</small>
+                            </div>
+                        </div>
+
                         <p>If you add an Entrant once, the next time you add an Entrant, the 'name' input will give you suggestions and auto-populate the Entrant's Name, Team and GUID.</p>
 
                         <div id="entrantTemplate" class="entrant">

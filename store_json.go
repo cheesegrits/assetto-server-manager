@@ -2,6 +2,7 @@ package servermanager
 
 import (
 	"encoding/json"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ const (
 	frameLinksFile    = "frame_links.json"
 	serverMetaDir     = "meta"
 	auditFile         = "audit.json"
+	entryListDir      = "entry_lists"
 
 	// shared data
 	championshipsDir = "championships"
@@ -112,6 +114,21 @@ func (rs *JSONStore) decodeFile(path string, filename string, out interface{}) e
 }
 
 func (rs *JSONStore) UpsertCustomRace(race *CustomRace) error {
+	// if LocalEntryList, write out the entry list to local store
+	if race.LocalEntryList {
+		err := rs.encodeFile(rs.base, filepath.Join(entryListDir, race.UUID.String()+".json"), race.EntryList)
+
+		if err != nil {
+			logrus.WithError(err).Errorf("Couldn't encode entry list")
+
+			return err
+		}
+
+		// replace the race entry list with a blank one
+		var entryList EntryList
+		race.EntryList = entryList
+	}
+
 	return rs.encodeFile(rs.shared, filepath.Join(customRacesDir, race.UUID.String()+".json"), race)
 }
 
@@ -122,6 +139,27 @@ func (rs *JSONStore) FindCustomRaceByID(uuid string) (*CustomRace, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	// if LocalEntryList, override the entry list with the one from local store
+	if customRace.LocalEntryList {
+		var entryList EntryList
+
+		_, err := os.Stat(filepath.Join(rs.base, entryListDir, uuid+".json"))
+
+		// the local entry list may not exist yet (race created on another server, not been edited here yet)
+		if !os.IsNotExist(err) {
+			err = rs.decodeFile(rs.base, filepath.Join(entryListDir, uuid+".json"), &entryList)
+
+			if err != nil {
+				logrus.WithError(err).Errorf("Couldn't decode entry list")
+
+				return nil, err
+			}
+		}
+
+		// replace with either the one we read form local store, or blank if not found
+		customRace.EntryList = entryList
 	}
 
 	return customRace, nil
